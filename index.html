@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GDC Plant 2 - Master Control Panel</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @keyframes pulse-red {
+            0%, 100% { border-color: rgb(51 65 85); }
+            50% { border-color: rgb(239 68 68); box-shadow: 0 0 15px rgba(239, 68, 68, 0.4); }
+        }
+        .alarm-border {
+            animation: pulse-red 2s infinite;
+        }
+    </style>
+</head>
+<body class="bg-slate-900 text-slate-100 font-sans min-h-screen selection:bg-blue-500/30">
+
+    <!-- CRITICAL ALARM BANNER -->
+    <div id="alarm-banner" class="hidden bg-red-600 text-white text-center py-2 text-sm font-bold tracking-wide uppercase transition-all duration-300 shadow-md w-full z-[60]">
+        ⚠️ CRITICAL ALARM: Total RT output is below Target Demand! ⚠️
+    </div>
+
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        
+        <!-- STICKY KPI HEADER -->
+        <div class="sticky top-0 z-50 bg-slate-900/95 backdrop-blur-md border-b border-slate-700 pt-6 pb-6 mb-8 transition-all duration-300" id="header-container">
+            <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
+                <div>
+                    <h1 class="text-2xl font-black bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-emerald-400">GDC Plant 2 Ops Panel</h1>
+                    <p class="text-slate-400 text-sm mt-1">Interactive Load & Import Sandbox</p>
+                </div>
+                
+                <div class="flex flex-col items-end gap-3">
+                    <!-- TARGET DEMAND FILTER -->
+                    <div id="demand-filters" class="flex flex-wrap justify-end gap-2 bg-slate-800 p-1.5 rounded-xl border border-slate-700"></div>
+                    <!-- YEAR FILTER -->
+                    <div id="year-filters" class="flex flex-wrap justify-end gap-2"></div>
+                </div>
+            </div>
+            
+            <!-- KPI CARDS -->
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div id="kpi-rt-card" class="bg-slate-800/80 p-4 rounded-xl border border-slate-700 shadow-lg transition-all duration-300">
+                    <div class="text-slate-400 text-xs font-bold uppercase tracking-wider mb-1">Target vs Output</div>
+                    <div class="text-2xl sm:text-3xl font-black flex items-baseline gap-1">
+                        <span id="kpi-target" class="text-slate-500 text-xl"></span>
+                        <span id="kpi-rt" class="text-emerald-400">0 RT</span>
+                    </div>
+                    <div id="kpi-tes-note" class="text-xs text-slate-500 font-medium mt-1 h-4"></div>
+                </div>
+                <div class="bg-slate-800/80 p-4 rounded-xl border border-slate-700 shadow-lg">
+                    <div class="text-slate-400 text-xs font-bold uppercase tracking-wider mb-1">Total Plant Load</div>
+                    <div id="kpi-load" class="text-2xl sm:text-3xl font-black text-amber-400">0.00 MW</div>
+                </div>
+                <div class="bg-slate-800/80 p-4 rounded-xl border border-slate-700 shadow-lg relative">
+                    <div class="text-slate-400 text-xs font-bold uppercase tracking-wider mb-1">GTG Generation</div>
+                    <div id="kpi-gen" class="text-2xl sm:text-3xl font-black text-emerald-400">0.00 MW</div>
+                    <div id="kpi-gen-note" class="text-xs text-amber-500 font-medium mt-1 h-4 hidden">Load Capped (Island)</div>
+                </div>
+                <div class="bg-slate-800/80 p-4 rounded-xl border border-slate-700 shadow-lg relative overflow-hidden">
+                    <div class="absolute right-0 top-0 w-1.5 h-full bg-blue-500"></div>
+                    <div class="text-slate-400 text-xs font-bold uppercase tracking-wider mb-1">Net TNB Import</div>
+                    <div id="kpi-net" class="text-2xl sm:text-3xl font-black text-slate-100">0.00 MW</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- EQUIPMENT TOGGLES CONTAINER -->
+        <div id="equipment-container" class="pb-20"></div>
+
+    </div>
+
+    <script>
+        // --- 1. EQUIPMENT DATABASE ---
+        const EQUIPMENT = [
+            { id: "ECC-A", type: "ECC", kw: 1065.0, rt: 1100, years: [2026,2027,2028,2029,2030] },
+            { id: "ECC-B", type: "ECC", kw: 1102.0, rt: 1250, years: [2026,2027,2028,2029,2030] },
+            { id: "ECC-C", type: "ECC", kw: 2245.0, rt: 3000, years: [2026,2027,2028,2029,2030] },
+            { id: "ECC-L", type: "ECC", kw: 1860.0, rt: 2494, years: [2026,2027,2028,2029,2030] },
+            { id: "ECC-D (New)", type: "ECC", kw: 1860.0, rt: 2500, years: [2027,2028,2029,2030] },
+            { id: "ECC-G (New)", type: "ECC", kw: 1860.0, rt: 2500, years: [2027,2028,2029,2030] },
+            { id: "ECC-B (New)", type: "ECC", kw: 1860.0, rt: 2500, years: [2027,2028,2029,2030] },
+            { id: "ECC-F (New)", type: "ECC", kw: 1860.0, rt: 2500, years: [2027,2028,2029,2030] },
+            { id: "ECC-E (New)", type: "ECC", kw: 1860.0, rt: 2500, years: [2028,2029,2030] },
+
+            { id: "SAC-B", type: "SAC", kw: 260.0, rt: 850, years: [2026] },
+            { id: "SAC-C", type: "SAC", kw: 485.0, rt: 2400, years: [2026,2027,2028,2029,2030] },
+            { id: "SAC-D", type: "SAC", kw: 260.0, rt: 900, years: [2026] },
+            { id: "SAC-E", type: "SAC", kw: 485.0, rt: 700, years: [2026,2027] },
+            { id: "SAC-F", type: "SAC", kw: 485.0, rt: 1200, years: [2026] },
+            { id: "SAC-H", type: "SAC", kw: 485.0, rt: 2000, years: [2026,2027,2028] },
+            { id: "SAC-J", type: "SAC", kw: 485.0, rt: 2250, years: [2026,2027,2028,2029,2030] },
+            { id: "SAC-K", type: "SAC", kw: 524.0, rt: 2200, years: [2026,2027] },
+            
+            { id: "DFC-A", type: "DFC", kw: 275.8, rt: 900, years: [2026] },
+            { id: "DFC-B", type: "DFC", kw: 275.8, rt: 1000, years: [2026] },
+            
+            { id: "GTG-A", type: "Generator", kw: 236.9, rt: 0, gen: 5300, years: [2026,2027,2028] },
+            { id: "GTG-B", type: "Generator", kw: 225.9, rt: 0, gen: 5300, years: [2026,2027,2028] },
+            
+            { id: "AGB-A", type: "Boiler", kw: 13.0, rt: 0, years: [2026,2027,2028,2029] },
+            { id: "AGB-B", type: "Boiler", kw: 13.0, rt: 0, years: [2026,2027,2028,2029] },
+            { id: "AGB-C", type: "Boiler", kw: 13.0, rt: 0, years: [2026,2027] },
+            
+            { id: "P-0101A", type: "SecPump", kw: 260.0, rt: 0, years: [2026,2027,2028,2029,2030] },
+            { id: "P-0101B", type: "SecPump", kw: 260.0, rt: 0, years: [2026,2027,2028,2029,2030] },
+            { id: "P-0101C", type: "SecPump", kw: 260.0, rt: 0, years: [2026,2027,2028,2029,2030] },
+            { id: "P-0101D", type: "SecPump", kw: 260.0, rt: 0, years: [2026,2027,2028,2029,2030] },
+            { id: "P-0101E", type: "SecPump", kw: 260.0, rt: 0, years: [2026,2027,2028,2029,2030] },
+            { id: "P-0101F", type: "SecPump", kw: 260.0, rt: 0, years: [2026,2027,2028,2029,2030] },
+            { id: "P-0101G", type: "SecPump", kw: 260.0, rt: 0, years: [2026,2027,2028,2029,2030] },
+
+            { id: "Fixed Loads", type: "Fixed", kw: 455.1, rt: 0, years: [2026,2027,2028,2029,2030] }
+        ];
+
+        const DEMANDS = [
+            { label: "Peak Day", value: 30000, tesRT: 8500 },
+            { label: "Normal Day", value: 26500, tesRT: 8500 },
+            { label: "Night Load", value: 15000, tesRT: 0 }
+        ];
+
+        // --- 2. APPLICATION STATE ---
+        let currentYear = 2026;
+        let currentDemand = DEMANDS[1]; // Default Normal Day
+        let equipmentState = {};
+        
+        function applyYearDefaults(year) {
+            EQUIPMENT.forEach(eq => {
+                if (eq.years.includes(year)) {
+                    equipmentState[eq.id] = (eq.type !== "Boiler");
+                } else {
+                    equipmentState[eq.id] = false;
+                }
+            });
+        }
+
+        // --- 3. MATH & LOGIC ---
+        function calculateKPIs() {
+            let totalRT = currentDemand.tesRT; // Add TES Tank base contribution
+            let totalLoadKW = 0;
+            let maxGtgCapacityKW = 0;
+
+            EQUIPMENT.forEach(eq => {
+                if (eq.years.includes(currentYear) && equipmentState[eq.id]) {
+                    totalRT += eq.rt;
+                    totalLoadKW += eq.kw;
+                    if (eq.type === "Generator" && eq.gen) {
+                        maxGtgCapacityKW += eq.gen;
+                    }
+                }
+            });
+
+            // Dynamic GTG Ramping Logic
+            let actualGtgGenKW = Math.min(maxGtgCapacityKW, totalLoadKW);
+            let netImportKW = totalLoadKW - actualGtgGenKW;
+
+            // Update UI - Load & Gen
+            document.getElementById('kpi-load').innerText = (totalLoadKW / 1000).toFixed(2) + " MW";
+            document.getElementById('kpi-gen').innerText = (actualGtgGenKW / 1000).toFixed(2) + " MW";
+            
+            // Show capping note if GTG is ramping down
+            if (maxGtgCapacityKW > totalLoadKW) {
+                document.getElementById('kpi-gen-note').classList.remove('hidden');
+            } else {
+                document.getElementById('kpi-gen-note').classList.add('hidden');
+            }
+
+            // Update UI - Net Import
+            let netEl = document.getElementById('kpi-net');
+            netEl.innerText = (netImportKW / 1000).toFixed(2) + " MW";
+            if(netImportKW <= 0) {
+                netEl.className = "text-2xl sm:text-3xl font-black text-emerald-400";
+            } else if (netImportKW > 10000) {
+                netEl.className = "text-2xl sm:text-3xl font-black text-red-400";
+            } else {
+                netEl.className = "text-2xl sm:text-3xl font-black text-amber-400";
+            }
+
+            // Update UI - RT & Alarms
+            const rtEl = document.getElementById('kpi-rt');
+            document.getElementById('kpi-target').innerText = currentDemand.value.toLocaleString() + " /";
+            rtEl.innerText = totalRT.toLocaleString() + " RT";
+            
+            if (currentDemand.tesRT > 0) {
+                document.getElementById('kpi-tes-note').innerText = `+8,500 RT from TES (Day)`;
+            } else {
+                document.getElementById('kpi-tes-note').innerText = ``;
+            }
+
+            const banner = document.getElementById('alarm-banner');
+            const rtCard = document.getElementById('kpi-rt-card');
+            
+            if (totalRT < currentDemand.value) {
+                banner.classList.remove('hidden');
+                rtEl.classList.replace('text-emerald-400', 'text-red-500');
+                rtCard.classList.add('alarm-border');
+            } else {
+                banner.classList.add('hidden');
+                rtEl.classList.replace('text-red-500', 'text-emerald-400');
+                rtCard.classList.remove('alarm-border');
+            }
+        }
+
+        // --- 4. UI RENDERING ---
+        function renderYearButtons() {
+            const container = document.getElementById('year-filters');
+            container.innerHTML = '';
+            [2026, 2027, 2028, 2029, 2030].forEach(y => {
+                const btn = document.createElement('button');
+                btn.innerText = y;
+                btn.className = `px-4 py-1.5 rounded-lg text-sm font-bold transition-all duration-200 ${y === currentYear ? 'bg-blue-500 text-white shadow-md' : 'bg-transparent text-slate-400 hover:bg-slate-700 hover:text-white'}`;
+                btn.onclick = () => { 
+                    currentYear = y; 
+                    applyYearDefaults(currentYear);
+                    renderYearButtons(); 
+                    renderEquipment(); 
+                    calculateKPIs(); 
+                };
+                container.appendChild(btn);
+            });
+        }
+
+        function renderDemandFilters() {
+            const container = document.getElementById('demand-filters');
+            container.innerHTML = '';
+            DEMANDS.forEach(d => {
+                const isActive = d.value === currentDemand.value;
+                const btn = document.createElement('button');
+                btn.innerHTML = `${d.label} <span class="text-[10px] opacity-75 font-normal">(${d.value/1000}k)</span>`;
+                btn.className = `px-3 py-1.5 rounded-lg text-xs font-bold transition-all duration-200 ${isActive ? 'bg-slate-600 text-white shadow-md' : 'bg-transparent text-slate-400 hover:text-white'}`;
+                btn.onclick = () => { 
+                    currentDemand = d; 
+                    renderDemandFilters(); 
+                    calculateKPIs(); 
+                };
+                container.appendChild(btn);
+            });
+        }
+
+        function toggleEq(id) {
+            equipmentState[id] = !equipmentState[id];
+            renderEquipment();
+            calculateKPIs();
+        }
+
+        function renderCategory(title, type) {
+            const items = EQUIPMENT.filter(eq => eq.type === type && eq.years.includes(currentYear));
+            if (items.length === 0) return ''; 
+            
+            let html = `
+            <div class="mb-8">
+                <h3 class="text-lg font-bold text-slate-300 border-b border-slate-700 pb-2 mb-4">${title}</h3>
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            `;
+            
+            items.forEach(eq => {
+                const isOn = equipmentState[eq.id];
+                const loadText = eq.type === 'Generator' ? `Cap: ${(eq.gen/1000).toFixed(2)} MW` : `Load: ${(eq.kw/1000).toFixed(2)} MW`;
+                const rtText = eq.rt > 0 ? ` | <span class="text-blue-300">${eq.rt} RT</span>` : '';
+                
+                const btnClass = isOn 
+                    ? 'bg-emerald-600 text-white shadow-[0_0_12px_rgba(16,185,129,0.3)] hover:bg-emerald-500 border border-emerald-500' 
+                    : 'bg-slate-800 text-slate-400 hover:bg-slate-700 border border-slate-600';
+                
+                const cardClass = isOn
+                    ? 'bg-slate-800/80 border-slate-600'
+                    : 'bg-slate-900 border-slate-800 opacity-80';
+
+                html += `
+                <div class="flex items-center justify-between p-4 rounded-xl border ${cardClass} transition-all duration-200">
+                    <div>
+                        <div class="font-bold text-slate-200 text-lg">${eq.id}</div>
+                        <div class="text-xs text-slate-400 mt-1">${loadText}${rtText}</div>
+                    </div>
+                    <button onclick="toggleEq('${eq.id}')" class="px-5 py-2.5 rounded-lg font-bold text-sm transition-all duration-200 w-20 ${btnClass}">
+                        ${isOn ? 'ON' : 'OFF'}
+                    </button>
+                </div>`;
+            });
+            
+            html += `</div></div>`;
+            return html;
+        }
+
+        function renderEquipment() {
+            const container = document.getElementById('equipment-container');
+            container.innerHTML = 
+                renderCategory("Electric Centrifugal Chillers (ECC)", "ECC") +
+                renderCategory("Steam Absorption Chillers (SAC)", "SAC") +
+                renderCategory("Direct Fired Chillers (DFC)", "DFC") +
+                renderCategory("Gas Turbine Generators (GTG)", "Generator") +
+                renderCategory("Auxiliary Gas Boilers (AGB)", "Boiler") +
+                renderCategory("Secondary Distribution Pumps", "SecPump") +
+                renderCategory("Base Facility Load", "Fixed");
+        }
+
+        // --- 5. INITIALIZATION ---
+        window.onload = () => {
+            applyYearDefaults(currentYear); 
+            renderDemandFilters();
+            renderYearButtons();
+            renderEquipment();
+            calculateKPIs();
+        };
+    </script>
+</body>
+</html>
