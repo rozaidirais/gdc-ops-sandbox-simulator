@@ -27,7 +27,6 @@
         .alarm-border { animation: pulse-red 2s infinite; }
         .hide-scrollbar::-webkit-scrollbar { display: none; }
         .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-        /* Remove arrows from number input */
         input[type="number"]::-webkit-inner-spin-button, 
         input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
         input[type="number"] { -moz-appearance: textfield; }
@@ -57,7 +56,17 @@
                 
                 <!-- Filters Block -->
                 <div class="flex flex-col w-full md:w-auto items-start md:items-end gap-1.5 sm:gap-3">
-                    <div id="demand-filters" class="flex flex-nowrap overflow-x-auto w-full md:w-auto hide-scrollbar justify-start md:justify-end gap-1 bg-gray-100 p-1 rounded-lg sm:rounded-xl border border-gray-200 shadow-inner"></div>
+                    
+                    <!-- Demand & Custom Input Row -->
+                    <div class="flex flex-wrap items-center gap-1.5 bg-gray-100 p-1 rounded-lg sm:rounded-xl border border-gray-200 shadow-inner w-full md:w-auto justify-start md:justify-end">
+                        <div id="demand-filters" class="flex flex-nowrap overflow-x-auto hide-scrollbar gap-1"></div>
+                        <div class="flex items-center gap-1 pl-1 border-l border-gray-300">
+                            <span class="text-[10px] font-bold text-gray-500">Custom:</span>
+                            <input type="number" id="custom-demand-input" placeholder="RT" oninput="updateCustomDemand(this.value)" 
+                                class="w-20 text-right bg-white border border-gray-300 rounded px-1.5 py-1 text-[11px] font-bold text-gray-900 focus:outline-none focus:ring-1 focus:ring-petronas-main" />
+                        </div>
+                    </div>
+
                     <div id="year-filters" class="flex flex-nowrap overflow-x-auto w-full md:w-auto hide-scrollbar justify-start md:justify-end gap-1 bg-gray-100 p-1 rounded-lg sm:rounded-xl border border-gray-200 shadow-inner"></div>
                 </div>
             </div>
@@ -153,9 +162,12 @@
         ];
 
         let currentYear = 2026;
-        let currentDemand = DEMANDS[1]; 
+        let currentDemandValue = DEMANDS[1].value; 
+        let currentTesRT = DEMANDS[1].tesRT;
+        let customDemandActive = false;
+
         let equipmentState = {};
-        let customRTState = {}; // Stores manual RT overrides
+        let customRTState = {}; 
         
         function applyYearDefaults(year) {
             EQUIPMENT.forEach(eq => {
@@ -167,21 +179,43 @@
             });
         }
 
-        // Called dynamically when user types in the input box
         function updateCustomRT(id, value) {
             customRTState[id] = value;
             calculateKPIs();
         }
 
+        function setPresetDemand(demandObj) {
+            customDemandActive = false;
+            currentDemandValue = demandObj.value;
+            currentTesRT = demandObj.tesRT;
+            document.getElementById('custom-demand-input').value = '';
+            renderDemandFilters();
+            calculateKPIs();
+        }
+
+        function updateCustomDemand(val) {
+            if (val !== '') {
+                let parsed = parseFloat(val);
+                if (!isNaN(parsed)) {
+                    customDemandActive = true;
+                    currentDemandValue = parsed;
+                    // Assume custom demand inherits normal day TES logic unless night selected, but keep it flexible: default TES to 8500 if > 15000, else 0
+                    currentTesRT = currentDemandValue > 18000 ? 8500 : 0;
+                    renderDemandFilters();
+                    calculateKPIs();
+                }
+            } else {
+                setPresetDemand(DEMANDS[1]); // Revert to normal if cleared
+            }
+        }
+
         function calculateKPIs() {
-            let totalRT = currentDemand.tesRT; 
+            let totalRT = currentTesRT; 
             let totalLoadKW = 0;
             let maxGtgCapacityKW = 0;
 
             EQUIPMENT.forEach(eq => {
                 if (eq.years.includes(currentYear) && equipmentState[eq.id]) {
-                    
-                    // Check if there is a manual RT override for this equipment
                     let activeRT = eq.rt;
                     if (customRTState[eq.id] !== undefined && customRTState[eq.id] !== '') {
                         let parsedRT = parseFloat(customRTState[eq.id]);
@@ -219,11 +253,11 @@
             }
 
             const rtEl = document.getElementById('kpi-rt');
-            document.getElementById('kpi-target').innerText = currentDemand.value.toLocaleString() + "/";
+            document.getElementById('kpi-target').innerText = currentDemandValue.toLocaleString() + "/";
             rtEl.innerText = totalRT.toLocaleString();
             
-            if (currentDemand.tesRT > 0) {
-                document.getElementById('kpi-tes-note').innerText = `+8.5k TES included`;
+            if (currentTesRT > 0) {
+                document.getElementById('kpi-tes-note').innerText = `+${currentTesRT.toLocaleString()} RT TES included`;
             } else {
                 document.getElementById('kpi-tes-note').innerText = ``;
             }
@@ -231,7 +265,7 @@
             const banner = document.getElementById('alarm-banner');
             const rtCard = document.getElementById('kpi-rt-card');
             
-            if (totalRT < currentDemand.value) {
+            if (totalRT < currentDemandValue) {
                 banner.classList.remove('hidden');
                 rtEl.classList.replace('text-petronas-main', 'text-red-600');
                 rtCard.classList.add('alarm-border');
@@ -252,7 +286,7 @@
                 btn.onclick = () => { 
                     currentYear = y; 
                     applyYearDefaults(currentYear);
-                    customRTState = {}; // Clear manual inputs when year changes
+                    customRTState = {}; 
                     renderYearButtons(); 
                     renderEquipment(); 
                     calculateKPIs(); 
@@ -265,15 +299,11 @@
             const container = document.getElementById('demand-filters');
             container.innerHTML = '';
             DEMANDS.forEach(d => {
-                const isActive = d.value === currentDemand.value;
+                const isActive = !customDemandActive && d.value === currentDemandValue;
                 const btn = document.createElement('button');
                 btn.innerHTML = `${d.label}`;
                 btn.className = `flex-shrink-0 px-2 sm:px-3 py-1 sm:py-1.5 rounded-md sm:rounded-lg text-[10px] sm:text-xs font-bold transition-all duration-200 ${isActive ? 'bg-white text-petronas-dark shadow-sm ring-1 ring-gray-200' : 'bg-transparent text-gray-500 hover:text-gray-900'}`;
-                btn.onclick = () => { 
-                    currentDemand = d; 
-                    renderDemandFilters(); 
-                    calculateKPIs(); 
-                };
+                btn.onclick = () => setPresetDemand(d);
                 container.appendChild(btn);
             });
         }
@@ -298,7 +328,6 @@
                 const isOn = equipmentState[eq.id];
                 const loadText = eq.type === 'Generator' ? `Cap: ${(eq.gen/1000).toFixed(2)} MW` : `Load: ${(eq.kw/1000).toFixed(2)} MW`;
                 
-                // Add the custom RT input box ONLY if the equipment produces RT
                 let rtInputHtml = '';
                 if (eq.rt > 0) {
                     let currentVal = customRTState[eq.id] !== undefined ? customRTState[eq.id] : '';
