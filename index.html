@@ -5,42 +5,60 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>GDC Plant 2 - Master Control Panel</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['"Segoe UI"', 'Roboto', 'Helvetica', 'Arial', 'sans-serif'],
+                    },
+                    colors: {
+                        petronas: { main: '#00A19C', dark: '#007A76', light: '#E6F6F5' }
+                    }
+                }
+            }
+        }
+    </script>
     <style>
         @keyframes pulse-red {
-            0%, 100% { border-color: rgb(51 65 85); }
-            50% { border-color: rgb(239 68 68); box-shadow: 0 0 10px rgba(239, 68, 68, 0.4); }
+            0%, 100% { border-color: #E5E7EB; }
+            50% { border-color: #EF4444; box-shadow: 0 0 10px rgba(239, 68, 68, 0.2); }
         }
-        .alarm-border {
-            animation: pulse-red 2s infinite;
-        }
-        /* Hide scrollbar for compact mobile filters */
+        .alarm-border { animation: pulse-red 2s infinite; }
         .hide-scrollbar::-webkit-scrollbar { display: none; }
         .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        /* Remove arrows from number input */
+        input[type="number"]::-webkit-inner-spin-button, 
+        input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+        input[type="number"] { -moz-appearance: textfield; }
     </style>
 </head>
-<body class="bg-slate-900 text-slate-100 font-sans min-h-screen selection:bg-blue-500/30">
+<body class="bg-gray-50 text-gray-800 font-sans min-h-screen selection:bg-petronas-light">
 
     <!-- CRITICAL ALARM BANNER -->
     <div id="alarm-banner" class="hidden bg-red-600 text-white text-center py-1 sm:py-2 text-[10px] sm:text-sm font-bold tracking-wide uppercase transition-all duration-300 shadow-md w-full z-[60]">
-        ⚠️ Total RT output is below Target Demand!
+        ⚠️ CAPACITY BELOW TARGET DEMAND! ⚠️
     </div>
 
     <div class="max-w-7xl mx-auto px-2 sm:px-6 lg:px-8">
         
-        <!-- STICKY KPI HEADER (Mobile Optimized) -->
-        <div class="sticky top-0 z-50 bg-slate-900/95 backdrop-blur-md border-b border-slate-700 pt-2 pb-2 mb-4 sm:pt-6 sm:pb-6 sm:mb-8 transition-all duration-300" id="header-container">
+        <!-- STICKY KPI HEADER -->
+        <div class="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-gray-200 pt-2 pb-2 mb-4 sm:pt-6 sm:pb-6 sm:mb-8 transition-all duration-300 shadow-sm" id="header-container">
             
             <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-2 sm:gap-4 mb-3 sm:mb-6">
                 <!-- Title Block -->
-                <div class="w-full md:w-auto flex justify-between items-center">
-                    <h1 class="text-lg sm:text-2xl font-black bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-emerald-400 leading-tight">GDC Plant 2 Ops</h1>
-                    <p class="hidden sm:block text-slate-400 text-sm mt-1">Interactive Load & Import Sandbox</p>
+                <div class="w-full md:w-auto flex items-center gap-2 sm:gap-3">
+                    <div class="w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-gradient-to-br from-petronas-main to-petronas-dark flex items-center justify-center text-white font-bold text-base sm:text-xl shadow-md flex-shrink-0">⚡</div>
+                    <div>
+                        <h1 class="text-lg sm:text-2xl font-bold tracking-tight text-gray-900 leading-tight">GDC Plant 2 Ops</h1>
+                        <p class="hidden sm:block text-gray-500 text-sm font-medium">Interactive Load & Import Sandbox</p>
+                    </div>
                 </div>
                 
                 <!-- Filters Block -->
                 <div class="flex flex-col w-full md:w-auto items-start md:items-end gap-1.5 sm:gap-3">
-                    <div id="demand-filters" class="flex flex-nowrap overflow-x-auto w-full md:w-auto hide-scrollbar justify-start md:justify-end gap-1 bg-slate-800 p-1 rounded-lg sm:rounded-xl border border-slate-700"></div>
-                    <div id="year-filters" class="flex flex-nowrap overflow-x-auto w-full md:w-auto hide-scrollbar justify-start md:justify-end gap-1"></div>
+                    <div id="demand-filters" class="flex flex-nowrap overflow-x-auto w-full md:w-auto hide-scrollbar justify-start md:justify-end gap-1 bg-gray-100 p-1 rounded-lg sm:rounded-xl border border-gray-200 shadow-inner"></div>
+                    <div id="year-filters" class="flex flex-nowrap overflow-x-auto w-full md:w-auto hide-scrollbar justify-start md:justify-end gap-1 bg-gray-100 p-1 rounded-lg sm:rounded-xl border border-gray-200 shadow-inner"></div>
                 </div>
             </div>
             
@@ -48,34 +66,34 @@
             <div class="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-4">
                 
                 <!-- Target vs Output -->
-                <div id="kpi-rt-card" class="bg-slate-800/80 p-2 sm:p-4 rounded-lg sm:rounded-xl border border-slate-700 shadow-sm sm:shadow-lg transition-all duration-300">
-                    <div class="text-slate-400 text-[9px] sm:text-xs font-bold uppercase tracking-wider mb-0.5 sm:mb-1">Target vs Output</div>
+                <div id="kpi-rt-card" class="bg-white p-2 sm:p-4 rounded-lg sm:rounded-xl border border-gray-200 shadow-sm transition-all duration-300">
+                    <div class="text-gray-400 text-[9px] sm:text-xs font-bold uppercase tracking-wider mb-0.5 sm:mb-1">Target vs Output</div>
                     <div class="text-base sm:text-3xl font-black flex items-baseline gap-1 leading-none">
-                        <span id="kpi-target" class="text-slate-500 text-xs sm:text-xl"></span>
-                        <span id="kpi-rt" class="text-emerald-400">0</span>
-                        <span class="text-[10px] sm:text-base text-emerald-400 font-bold">RT</span>
+                        <span id="kpi-target" class="text-gray-400 text-xs sm:text-xl"></span>
+                        <span id="kpi-rt" class="text-petronas-main">0</span>
+                        <span class="text-[10px] sm:text-base text-gray-500 font-bold">RT</span>
                     </div>
-                    <div id="kpi-tes-note" class="text-[8px] sm:text-xs text-slate-500 font-medium mt-1 sm:mt-1 h-3 sm:h-4"></div>
+                    <div id="kpi-tes-note" class="text-[8px] sm:text-xs text-petronas-main font-bold mt-1 sm:mt-1 h-3 sm:h-4"></div>
                 </div>
 
                 <!-- Total Plant Load -->
-                <div class="bg-slate-800/80 p-2 sm:p-4 rounded-lg sm:rounded-xl border border-slate-700 shadow-sm sm:shadow-lg">
-                    <div class="text-slate-400 text-[9px] sm:text-xs font-bold uppercase tracking-wider mb-0.5 sm:mb-1">Plant Load</div>
-                    <div id="kpi-load" class="text-base sm:text-3xl font-black text-amber-400 leading-none mt-1 sm:mt-0">0.00 MW</div>
+                <div class="bg-white p-2 sm:p-4 rounded-lg sm:rounded-xl border border-gray-200 shadow-sm">
+                    <div class="text-gray-400 text-[9px] sm:text-xs font-bold uppercase tracking-wider mb-0.5 sm:mb-1">Plant Load</div>
+                    <div id="kpi-load" class="text-base sm:text-3xl font-black text-gray-800 leading-none mt-1 sm:mt-0">0.00 MW</div>
                 </div>
 
                 <!-- GTG Gen -->
-                <div class="bg-slate-800/80 p-2 sm:p-4 rounded-lg sm:rounded-xl border border-slate-700 shadow-sm sm:shadow-lg relative">
-                    <div class="text-slate-400 text-[9px] sm:text-xs font-bold uppercase tracking-wider mb-0.5 sm:mb-1">GTG Gen</div>
-                    <div id="kpi-gen" class="text-base sm:text-3xl font-black text-emerald-400 leading-none mt-1 sm:mt-0">0.00 MW</div>
-                    <div id="kpi-gen-note" class="text-[8px] sm:text-xs text-amber-500 font-medium mt-1 sm:mt-1 h-3 sm:h-4 hidden">Load Capped</div>
+                <div class="bg-white p-2 sm:p-4 rounded-lg sm:rounded-xl border border-gray-200 shadow-sm relative">
+                    <div class="text-gray-400 text-[9px] sm:text-xs font-bold uppercase tracking-wider mb-0.5 sm:mb-1">GTG Gen</div>
+                    <div id="kpi-gen" class="text-base sm:text-3xl font-black text-petronas-main leading-none mt-1 sm:mt-0">0.00 MW</div>
+                    <div id="kpi-gen-note" class="text-[8px] sm:text-xs text-orange-500 font-bold mt-1 sm:mt-1 h-3 sm:h-4 hidden">Load Capped (Island)</div>
                 </div>
 
                 <!-- Net Import -->
-                <div class="bg-slate-800/80 p-2 sm:p-4 rounded-lg sm:rounded-xl border border-slate-700 shadow-sm sm:shadow-lg relative overflow-hidden">
-                    <div class="absolute right-0 top-0 w-1 sm:w-1.5 h-full bg-blue-500"></div>
-                    <div class="text-slate-400 text-[9px] sm:text-xs font-bold uppercase tracking-wider mb-0.5 sm:mb-1">Net TNB</div>
-                    <div id="kpi-net" class="text-base sm:text-3xl font-black text-slate-100 leading-none mt-1 sm:mt-0">0.00 MW</div>
+                <div class="bg-white p-2 sm:p-4 rounded-lg sm:rounded-xl border border-gray-200 shadow-sm relative overflow-hidden">
+                    <div class="absolute right-0 top-0 w-1 sm:w-1.5 h-full bg-gray-300"></div>
+                    <div class="text-gray-400 text-[9px] sm:text-xs font-bold uppercase tracking-wider mb-0.5 sm:mb-1">Net TNB</div>
+                    <div id="kpi-net" class="text-base sm:text-3xl font-black text-gray-800 leading-none mt-1 sm:mt-0">0.00 MW</div>
                 </div>
 
             </div>
@@ -137,6 +155,7 @@
         let currentYear = 2026;
         let currentDemand = DEMANDS[1]; 
         let equipmentState = {};
+        let customRTState = {}; // Stores manual RT overrides
         
         function applyYearDefaults(year) {
             EQUIPMENT.forEach(eq => {
@@ -148,6 +167,12 @@
             });
         }
 
+        // Called dynamically when user types in the input box
+        function updateCustomRT(id, value) {
+            customRTState[id] = value;
+            calculateKPIs();
+        }
+
         function calculateKPIs() {
             let totalRT = currentDemand.tesRT; 
             let totalLoadKW = 0;
@@ -155,7 +180,15 @@
 
             EQUIPMENT.forEach(eq => {
                 if (eq.years.includes(currentYear) && equipmentState[eq.id]) {
-                    totalRT += eq.rt;
+                    
+                    // Check if there is a manual RT override for this equipment
+                    let activeRT = eq.rt;
+                    if (customRTState[eq.id] !== undefined && customRTState[eq.id] !== '') {
+                        let parsedRT = parseFloat(customRTState[eq.id]);
+                        if (!isNaN(parsedRT)) activeRT = parsedRT;
+                    }
+
+                    totalRT += activeRT;
                     totalLoadKW += eq.kw;
                     if (eq.type === "Generator" && eq.gen) {
                         maxGtgCapacityKW += eq.gen;
@@ -178,11 +211,11 @@
             let netEl = document.getElementById('kpi-net');
             netEl.innerText = (netImportKW / 1000).toFixed(2) + " MW";
             if(netImportKW <= 0) {
-                netEl.className = "text-base sm:text-3xl font-black text-emerald-400 mt-1 sm:mt-0 leading-none";
+                netEl.className = "text-base sm:text-3xl font-black text-petronas-main mt-1 sm:mt-0 leading-none";
             } else if (netImportKW > 10000) {
-                netEl.className = "text-base sm:text-3xl font-black text-red-400 mt-1 sm:mt-0 leading-none";
+                netEl.className = "text-base sm:text-3xl font-black text-red-500 mt-1 sm:mt-0 leading-none";
             } else {
-                netEl.className = "text-base sm:text-3xl font-black text-amber-400 mt-1 sm:mt-0 leading-none";
+                netEl.className = "text-base sm:text-3xl font-black text-orange-500 mt-1 sm:mt-0 leading-none";
             }
 
             const rtEl = document.getElementById('kpi-rt');
@@ -190,7 +223,7 @@
             rtEl.innerText = totalRT.toLocaleString();
             
             if (currentDemand.tesRT > 0) {
-                document.getElementById('kpi-tes-note').innerText = `+8.5k TES`;
+                document.getElementById('kpi-tes-note').innerText = `+8.5k TES included`;
             } else {
                 document.getElementById('kpi-tes-note').innerText = ``;
             }
@@ -200,13 +233,11 @@
             
             if (totalRT < currentDemand.value) {
                 banner.classList.remove('hidden');
-                rtEl.classList.replace('text-emerald-400', 'text-red-500');
-                rtEl.nextElementSibling.classList.replace('text-emerald-400', 'text-red-500');
+                rtEl.classList.replace('text-petronas-main', 'text-red-600');
                 rtCard.classList.add('alarm-border');
             } else {
                 banner.classList.add('hidden');
-                rtEl.classList.replace('text-red-500', 'text-emerald-400');
-                rtEl.nextElementSibling.classList.replace('text-red-500', 'text-emerald-400');
+                rtEl.classList.replace('text-red-600', 'text-petronas-main');
                 rtCard.classList.remove('alarm-border');
             }
         }
@@ -217,10 +248,11 @@
             [2026, 2027, 2028, 2029, 2030].forEach(y => {
                 const btn = document.createElement('button');
                 btn.innerText = y;
-                btn.className = `flex-shrink-0 px-3 sm:px-4 py-1 sm:py-1.5 rounded-md sm:rounded-lg text-[11px] sm:text-sm font-bold transition-all duration-200 ${y === currentYear ? 'bg-blue-500 text-white shadow-sm' : 'bg-transparent text-slate-400 hover:bg-slate-700 hover:text-white border border-slate-700 sm:border-none'}`;
+                btn.className = `flex-shrink-0 px-3 sm:px-4 py-1 sm:py-1.5 rounded-md sm:rounded-lg text-[11px] sm:text-sm font-bold transition-all duration-200 ${y === currentYear ? 'bg-white text-petronas-dark shadow-sm ring-1 ring-gray-200' : 'bg-transparent text-gray-500 hover:text-gray-900'}`;
                 btn.onclick = () => { 
                     currentYear = y; 
                     applyYearDefaults(currentYear);
+                    customRTState = {}; // Clear manual inputs when year changes
                     renderYearButtons(); 
                     renderEquipment(); 
                     calculateKPIs(); 
@@ -236,7 +268,7 @@
                 const isActive = d.value === currentDemand.value;
                 const btn = document.createElement('button');
                 btn.innerHTML = `${d.label}`;
-                btn.className = `flex-shrink-0 px-2 sm:px-3 py-1 sm:py-1.5 rounded-md sm:rounded-lg text-[10px] sm:text-xs font-bold transition-all duration-200 ${isActive ? 'bg-slate-600 text-white shadow-sm' : 'bg-transparent text-slate-400 hover:text-white'}`;
+                btn.className = `flex-shrink-0 px-2 sm:px-3 py-1 sm:py-1.5 rounded-md sm:rounded-lg text-[10px] sm:text-xs font-bold transition-all duration-200 ${isActive ? 'bg-white text-petronas-dark shadow-sm ring-1 ring-gray-200' : 'bg-transparent text-gray-500 hover:text-gray-900'}`;
                 btn.onclick = () => { 
                     currentDemand = d; 
                     renderDemandFilters(); 
@@ -258,32 +290,48 @@
             
             let html = `
             <div class="mb-6 sm:mb-8">
-                <h3 class="text-sm sm:text-lg font-bold text-slate-300 border-b border-slate-700 pb-1 sm:pb-2 mb-3 sm:mb-4">${title}</h3>
-                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2 sm:gap-4">
+                <h3 class="text-sm sm:text-lg font-bold text-gray-800 border-b border-gray-200 pb-1 sm:pb-2 mb-3 sm:mb-4">${title}</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
             `;
             
             items.forEach(eq => {
                 const isOn = equipmentState[eq.id];
                 const loadText = eq.type === 'Generator' ? `Cap: ${(eq.gen/1000).toFixed(2)} MW` : `Load: ${(eq.kw/1000).toFixed(2)} MW`;
-                const rtText = eq.rt > 0 ? ` | <span class="text-blue-300">${eq.rt} RT</span>` : '';
                 
+                // Add the custom RT input box ONLY if the equipment produces RT
+                let rtInputHtml = '';
+                if (eq.rt > 0) {
+                    let currentVal = customRTState[eq.id] !== undefined ? customRTState[eq.id] : '';
+                    let inputState = !isOn ? 'disabled opacity-40' : '';
+                    rtInputHtml = `
+                    <div class="flex items-center gap-1.5 mr-2">
+                        <input type="number" min="0" value="${currentVal}" placeholder="${eq.rt}" oninput="updateCustomRT('${eq.id}', this.value)" ${inputState}
+                            class="w-14 sm:w-16 text-right bg-gray-100 border border-gray-300 rounded px-1.5 py-1 text-[10px] sm:text-xs font-bold text-gray-900 focus:outline-none focus:ring-1 focus:ring-petronas-main focus:bg-white transition-all placeholder-gray-400" />
+                        <span class="text-[9px] sm:text-[10px] font-bold text-gray-400">RT</span>
+                    </div>`;
+                }
+
                 const btnClass = isOn 
-                    ? 'bg-emerald-600 text-white shadow-[0_0_8px_rgba(16,185,129,0.3)] hover:bg-emerald-500 border border-emerald-500' 
-                    : 'bg-slate-800 text-slate-400 hover:bg-slate-700 border border-slate-600';
+                    ? 'bg-petronas-main text-white shadow-md hover:bg-petronas-dark' 
+                    : 'bg-gray-200 text-gray-500 hover:bg-gray-300';
                 
                 const cardClass = isOn
-                    ? 'bg-slate-800/80 border-slate-600'
-                    : 'bg-slate-900 border-slate-800 opacity-80';
+                    ? 'bg-white border-gray-200 shadow-sm'
+                    : 'bg-gray-50 border-gray-100 opacity-80';
 
                 html += `
                 <div class="flex items-center justify-between p-3 sm:p-4 rounded-lg sm:rounded-xl border ${cardClass} transition-all duration-200">
-                    <div>
-                        <div class="font-bold text-slate-200 text-sm sm:text-lg">${eq.id}</div>
-                        <div class="text-[10px] sm:text-xs text-slate-400 mt-0.5 sm:mt-1">${loadText}${rtText}</div>
+                    <div class="flex-grow">
+                        <div class="font-bold text-gray-900 text-sm sm:text-base">${eq.id}</div>
+                        <div class="text-[10px] sm:text-xs text-gray-500 mt-0.5">${loadText}</div>
                     </div>
-                    <button onclick="toggleEq('${eq.id}')" class="px-4 sm:px-5 py-1.5 sm:py-2.5 rounded-md sm:rounded-lg font-bold text-xs sm:text-sm transition-all duration-200 w-16 sm:w-20 ${btnClass}">
-                        ${isOn ? 'ON' : 'OFF'}
-                    </button>
+                    
+                    <div class="flex items-center">
+                        ${rtInputHtml}
+                        <button onclick="toggleEq('${eq.id}')" class="px-3 sm:px-4 py-1.5 sm:py-2 rounded-md sm:rounded-lg font-bold text-[11px] sm:text-xs transition-all duration-200 w-14 sm:w-16 flex-shrink-0 ${btnClass}">
+                            ${isOn ? 'ON' : 'OFF'}
+                        </button>
+                    </div>
                 </div>`;
             });
             
